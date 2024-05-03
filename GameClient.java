@@ -60,7 +60,7 @@ public class GameClient {
     }
 
     public static void main(String[] args) {
-        String serverAddress = "localhost"; // Change this to the server's IP address or hostname
+        String serverAddress = "192.168.1.117"; // Change this to the server's IP address or hostname
         int serverPort = 12345; // Change this to the server's port number
         new GameClient(serverAddress, serverPort);
     }

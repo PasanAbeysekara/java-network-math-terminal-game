@@ -45,10 +45,9 @@ public class GameServer {
             String question = generateQuestion();
             broadcast("Question: " + question);
     
-            // Use AtomicReference to store the earliest correct answer details
             AtomicReference<AnswerRecord> firstCorrectAnswer = new AtomicReference<>(new AnswerRecord(-1, Long.MAX_VALUE));
-    
             CountDownLatch latch = new CountDownLatch(2); // For waiting both threads
+            int[] localScores = {0, 0}; // Local scores to handle score adjustments
     
             // Create a thread for each player to handle answers
             for (int i = 0; i < 2; i++) {
@@ -60,16 +59,18 @@ public class GameServer {
                         int answer = Integer.parseInt(answerStr);
                         boolean isCorrect = evaluateSingleAnswer(question, answer);
     
-                        // Only consider this answer if it's correct
                         if (isCorrect) {
                             // Update if this answer is earlier than the current earliest
                             firstCorrectAnswer.getAndUpdate(prev -> {
                                 if (timestamp < prev.timestamp) {
+                                    localScores[playerIndex] = 1; // Correct answer, potential point
                                     return new AnswerRecord(playerIndex, timestamp);
                                 } else {
                                     return prev;
                                 }
                             });
+                        } else {
+                            localScores[playerIndex] = -1; // Incorrect answer, deduct point
                         }
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -86,25 +87,25 @@ public class GameServer {
             }
     
             AnswerRecord result = firstCorrectAnswer.get();
-            if (result.playerIndex != -1) { // Check if there's a correct answer
-                scores[result.playerIndex]++;
-                broadcast("Player " + (result.playerIndex + 1) + " answered first correctly! Score: " + scores[result.playerIndex]);
-                if (scores[result.playerIndex] == targetScore) {
-                    broadcast("Player " + (result.playerIndex + 1) + " wins!");
-                    gameRunning = false;
-                }
-            } else {
-                broadcast("No correct answers were received.");
+            // Apply score changes
+            for (int i = 0; i < 2; i++) {
+                scores[i] += localScores[i];
+                // if (localScores[i] != 0) { // Only broadcast if there was a change
+                //     broadcast("Player " + (i + 1) + " Score: " + scores[i]);
+                // }
+                broadcast("Player " + (i + 1) + " Score: " + scores[i]);
             }
     
-            // Update scores
-            broadcast("Player 1 Score: " + scores[0]);
-            broadcast("Player 2 Score: " + scores[1]);
+            if (result.playerIndex != -1 && scores[result.playerIndex] == targetScore) {
+                broadcast("Player " + (result.playerIndex + 1) + " wins!");
+                gameRunning = false;
+            }
     
             // Switch to the other player
             currentPlayerIndex = (currentPlayerIndex + 1) % 2;
         }
     }
+    
     
     private boolean evaluateSingleAnswer(String question, int answer) {
         // Implement the logic to check if the provided answer is correct for the given question

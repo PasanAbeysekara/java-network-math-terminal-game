@@ -1,5 +1,6 @@
 import java.io.*;
 import java.net.*;
+import java.util.Arrays;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
@@ -98,14 +99,43 @@ public class GameServer {
     
             if (result.playerIndex != -1 && scores[result.playerIndex] == targetScore) {
                 broadcast("Player " + (result.playerIndex + 1) + " wins!");
-                gameRunning = false;
+                broadcast("Do you want to play again? Please answer 'yes' or 'no'.");
+                gameRunning = false; // temporarily stop the game loop
+            
+                // Collect responses from both players
+                boolean allAgree = handleReplayResponse();
+                if (allAgree) {
+                    resetGame();
+                    gameRunning = true; // restart the game loop
+                } else {
+                    broadcast("Game over. Server will shut down.");
+                    break; // exit the game loop
+                }
             }
     
             // Switch to the other player
             currentPlayerIndex = (currentPlayerIndex + 1) % 2;
         }
+
     }
-    
+
+    private boolean handleReplayResponse() throws IOException {
+        int agreeCount = 0;
+        for (int i = 0; i < 2; i++) {
+            String response = readers[i].readLine();
+            if ("yes".equalsIgnoreCase(response)) {
+                agreeCount++;
+            }
+        }
+        return agreeCount == 2; // Both players must agree to replay
+    }
+
+    private void resetGame() {
+        Arrays.fill(scores, 0); // Reset scores
+        currentPlayerIndex = 0; // Reset to first player
+        broadcast("New game starting...");
+    }
+
     
     private boolean evaluateSingleAnswer(String question, int answer) {
         // Implement the logic to check if the provided answer is correct for the given question
@@ -160,38 +190,6 @@ public class GameServer {
         }
         return String.format("%d %s %d",number1,operator,number2);
     }
-
-    private int evaluateAnswers(String question, int[] answers) {
-        // Your code to evaluate the answers and return the index of the correct answer player
-        // Implement your logic here
-        // For example, if the second player's answer is correct, return 1
-        String[] args = question.split(" ");
-        int number1 = Integer.parseInt(args[0]);
-        int number2 = Integer.parseInt(args[2]);
-        int answer = 0;
-        switch(args[1]){
-            case "+":
-				answer = number1 + number2;
-				break;
-			case "-":
-				answer = number1 - number2;
-				break;
-			case "/":
-				answer = number1 / number2;
-				break;
-			case "x":
-				answer = number1 * number2;
-				break;
-			default:
-				answer = 0;
-				break;
-        }
-        int tmp=-1;
-        if(answers[0]==answer) tmp = 0;
-        else if(answers[1]==answer) tmp = 1;
-        return tmp;
-    }
-    
 
     private void broadcast(String message) {
         for (PrintWriter writer : writers) {
